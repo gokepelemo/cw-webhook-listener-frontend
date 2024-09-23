@@ -46,6 +46,7 @@ pymdown-extensions==10.10.1
 pyparsing==3.1.4
 pyperclip==1.9.0
 python-dateutil==2.9.0.post0
+python-dotenv==1.0.1
 pytz==2024.2
 PyYAML==6.0.2
 referencing==0.35.1
