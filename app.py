@@ -12,8 +12,7 @@ WEBHOOK_TYPES = ["Deploy", "Copy to Live", "Copy to Staging"]
 
 # Variables
 webhook_id = ""
-api_url = "http://localhost:3000/webhook"
-webhook_url = "https://seal-app-ng3cf.ondigitalocean.app/webhook"
+api_url = "https://seal-app-ng3cf.ondigitalocean.app/webhook"
 secret_key = os.environ.get("SECRET_KEY", "default_secret_key")
 
 # Functions
