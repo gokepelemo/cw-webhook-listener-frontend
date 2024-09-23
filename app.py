@@ -86,17 +86,19 @@ elif st.session_state["webhook_action"] == "delete":
 
 # Form inputs
 email = st.text_input("Email", on_change=reset_action_completed, key="email", value=st.session_state.get("email", ""), autocomplete="email")
-server_id = st.text_input("Server ID", on_change=reset_action_completed, key="server_id", value=st.session_state.get("server_id", ""), autocomplete="on")
-app_id = st.text_input("App ID", on_change=reset_action_completed, key="app_id", value=st.session_state.get("app_id", ""), autocomplete="on")
-type = st.selectbox("Type", WEBHOOK_TYPES, index=parse_webhook_type(st.session_state.get("type", "")), placeholder="Select a webhook type...", on_change=reset_action_completed, key="type")
+if st.session_state["webhook_action"] != "delete":
+    server_id = st.text_input("Server ID", on_change=reset_action_completed, key="server_id", value=st.session_state.get("server_id", ""), autocomplete="on")
+    app_id = st.text_input("App ID", on_change=reset_action_completed, key="app_id", value=st.session_state.get("app_id", ""), autocomplete="on")
+    type = st.selectbox("Type", WEBHOOK_TYPES, index=parse_webhook_type(st.session_state.get("type", "")), placeholder="Select a webhook type...", on_change=reset_action_completed, key="type")
 
-if type == "Deploy":
+if st.session_state["type"] == "Deploy":
     deploy_path = st.text_input("Deploy Path", on_change=reset_action_completed, key="deploy_path", value=st.session_state.get("deploy_path", ""), autocomplete="on")
     branch_name = st.text_input("Branch Name", on_change=reset_action_completed, key="branch_name", value=st.session_state.get("branch_name", ""), autocomplete="on")
-    backup=st.toggle("Take backup first", on_change=reset_action_completed, key="backup", value=False)
-elif type == "Copy to Live" or type == "Copy to Staging":
+elif st.session_state["type"] == "Copy to Live" or st.session_state["type"] == "Copy to Staging":
     staging_server_id = st.text_input("Staging Server ID", on_change=reset_action_completed, key="staging_server_id", value=st.session_state.get("staging_server_id", ""), autocomplete="on")
     staging_app_id = st.text_input("Staging App ID", on_change=reset_action_completed, key="staging_app_id", value=st.session_state.get("staging_app_id", ""), autocomplete="on")
+if st.session_state["webhook_action"] != "delete":
+    backup=st.toggle("Take backup first", on_change=reset_action_completed, key="backup", value=False)
 
 # Form submission
 if not st.session_state["action_completed"]:
@@ -109,30 +111,34 @@ if not st.session_state["action_completed"]:
         email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
         if not re.match(email_pattern, st.session_state["email"]):
             st.error("Invalid email address.")
-        elif not server_id:
+        elif not st.session_state["server_id"]:
             st.error("Server ID is required.")
-        elif not app_id:
+        elif not st.session_state["app_id"]:
             st.error("App ID is required.")
-        elif not type:
+        elif not st.session_state["type"]:
             st.error("Type is required.")
-        elif type == "Deploy" and (not deploy_path or not branch_name):
+        elif st.session_state["type"] == "Deploy" and (not st.session_state["deploy_path"] or not st.session_state["branch_name"]):
             st.error("Deploy Path and Branch Name are required for Deploy type.")
-        elif type in ["Copy to Live", "Copy to Staging"] and (not staging_server_id or not staging_app_id):
+        elif st.session_state["type"] in ["Copy to Live", "Copy to Staging"] and (not st.session_state["staging_server_id"] or not st.session_state["staging_app_id"]):
             st.error("Staging Server ID and Staging App ID are required for Copy to Live or Copy to Staging type.")
         else:
             # Payload
+            normalized_type = st.session_state["type"].replace(" ", "").lower()
             payload = {
-            "server_id": st.session_state["server_id"],
-            "app_id": st.session_state["app_id"],
-            "secret_key": os.environ.get("SECRET_KEY", secret_key),
+            "serverId": st.session_state["server_id"],
+            "appId": st.session_state["app_id"],
+            "secretKey": os.environ.get("SECRET_KEY", secret_key),
+            "backup": st.session_state["backup"],
+            "email": st.session_state["email"],
+            "type": normalized_type,
+            "apiKey": os.environ.get("API_KEY", "default_api_key")
             }
             if type == "Deploy":
-                payload["deploy_path"] = st.session_state["deploy_path"]
-                payload["branch_name"] = st.session_state["branch_name"]
-                payload["backup"] = st.session_state["backup"]
+                payload["deployPath"] = st.session_state["deploy_path"]
+                payload["branchName"] = st.session_state["branch_name"]
             elif type == "Copy to Live" or type == "Copy to Staging":
-                payload["staging_server_id"] = st.session_state["staging_server_id"]
-                payload["staging_app_id"] = st.session_state["staging_app_id"]
+                payload["stagingServerId"] = st.session_state["staging_server_id"]
+                payload["stagingAppId"] = st.session_state["staging_app_id"]
                 payload["backup"] = st.session_state["backup"]
 
             # Post request to the API
