@@ -131,7 +131,7 @@ elif st.session_state["webhook_action"] == "delete":
 
 # Form inputs
 email = st.text_input("Email", on_change=reset_action_completed, key="email", autocomplete="email")
-if st.session_state["webhook_action"] != "create":
+if st.session_state["webhook_action"] == "create":
     api_key = st.text_input("API Key", on_change=reset_action_completed, key="api_key", autocomplete="on", placeholder="Optional: Enter to use your own API key", type="password")
 if st.session_state["webhook_action"] != "delete":
     server_id = st.text_input("Server ID", on_change=reset_action_completed, key="server_id", autocomplete="on")
