@@ -40,12 +40,6 @@ api_url = f"{app_url}/webhook"
 secret_key = os.environ.get("SECRET_KEY")
 
 # Functions
-def parse_webhook_type(webhook_type):
-    try:
-        return WEBHOOK_TYPES.index(webhook_type)
-    except ValueError:
-        return None
-
 # Reset action completed status and populate or clear form fields with webhook details on change
 def reset_action_completed(webhook_id_changed=False):
     st.session_state["action_completed"] = False
@@ -132,7 +126,7 @@ email = st.text_input("Email", on_change=reset_action_completed, key="email", au
 if st.session_state["webhook_action"] != "delete":
     server_id = st.text_input("Server ID", on_change=reset_action_completed, key="server_id", autocomplete="on")
     app_id = st.text_input("App ID", on_change=reset_action_completed, key="app_id", autocomplete="on")
-    type = st.selectbox("Type", WEBHOOK_TYPES, index=parse_webhook_type(st.session_state.get("type", "")), placeholder="Select a webhook type...", on_change=reset_action_completed, key="type")
+    type = st.selectbox("Type", WEBHOOK_TYPES, index=None, placeholder="Select a webhook type...", on_change=reset_action_completed, key="type")
 
 if st.session_state["type"] == "Deploy":
     deploy_path = st.text_input("Deploy Path", on_change=reset_action_completed, key="deploy_path", autocomplete="on")
