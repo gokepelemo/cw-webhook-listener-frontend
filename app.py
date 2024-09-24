@@ -1,5 +1,9 @@
 import streamlit as st
 from dotenv import load_dotenv as env
+import base64
+from Crypto.Cipher import AES
+from Crypto.Protocol.KDF import scrypt
+from Crypto.Random import get_random_bytes
 import requests
 import time
 import re
@@ -19,7 +23,8 @@ SESSION_STATE_MAP = {
     "branchName": "branch_name",
     "stagingServerId": "staging_server_id",
     "stagingAppId": "staging_app_id",
-    "type": "type"
+    "type": "type",
+    "apiKey": "api_key"
 }
 
 WEBHOOK_TYPE_MAP = {
@@ -32,8 +37,20 @@ WEBHOOK_TYPE_MAP = {
 app_url = "https://seal-app-ng3cf.ondigitalocean.app" if os.environ.get("PRODUCTION") == "True" else "http://localhost:3000"
 api_url = f"{app_url}/webhook"
 secret_key = os.environ.get("SECRET_KEY")
+salt = get_random_bytes(16)
+api_secret = os.environ.get("API_SECRET")
+scrypt_key = scrypt(api_secret, salt, 32, N=2**14, r=8, p=1)
 
 # Functions
+def encrypt_api_key(api_key, key):
+    cipher = AES.new(key, AES.MODE_GCM)
+    ciphertext, tag = cipher.encrypt_and_digest(api_key.encode('utf-8'))
+    return {
+        'ciphertext': base64.b64encode(ciphertext).decode('utf-8'),
+        'tag': base64.b64encode(tag).decode('utf-8'),
+        'nonce': base64.b64encode(cipher.nonce).decode('utf-8')
+    }
+
 def reset_action_completed(webhook_id_changed=False):
     st.session_state["action_completed"] = False
     webhook_id = st.session_state["webhook_id"].strip()
@@ -50,7 +67,7 @@ def reset_action_completed(webhook_id_changed=False):
                     st.session_state[key] = WEBHOOK_TYPE_MAP.get(value)
         else:
             st.error(f"Failed to retrieve webhook details: {webhook_details.text}", icon="❌")
-    elif len(webhook_id) == 0:
+    elif st.session_state["webhook_action"] != "create" and len(webhook_id) == 0:
         clear_form_fields()
 
 def clear_form_fields():
@@ -115,6 +132,7 @@ elif st.session_state["webhook_action"] == "delete":
 
 # Form inputs
 email = st.text_input("Email", on_change=reset_action_completed, key="email", autocomplete="email")
+api_key = st.text_input("API Key", on_change=reset_action_completed, key="api_key", autocomplete="on", placeholder="Optional: Enter to use your own API key", type="password")
 if st.session_state["webhook_action"] != "delete":
     server_id = st.text_input("Server ID", on_change=reset_action_completed, key="server_id", autocomplete="on")
     app_id = st.text_input("App ID", on_change=reset_action_completed, key="app_id", autocomplete="on")
@@ -153,6 +171,15 @@ if not st.session_state["action_completed"]:
         else:
             # Payload
             normalized_type = st.session_state["type"].replace(" ", "").lower()
+            api_key = st.session_state["api_key"].strip() if st.session_state["api_key"] else os.environ.get("API_KEY")
+            if api_key:
+                encrypted_api_key = encrypt_api_key(api_key, scrypt_key)
+                api_key = {
+                    'salt': base64.b64encode(salt).decode('utf-8'),
+                    'ciphertext': encrypted_api_key['ciphertext'],
+                    'tag': encrypted_api_key['tag'],
+                    'nonce': encrypted_api_key['nonce']
+                }
             payload = {
                 "serverId": st.session_state["server_id"].strip(),
                 "appId": st.session_state["app_id"].strip(),
@@ -160,7 +187,7 @@ if not st.session_state["action_completed"]:
                 "backup": st.session_state["backup"],
                 "email": st.session_state["email"].strip(),
                 "type": normalized_type,
-                "apiKey": os.environ.get("API_KEY", "default_api_key")
+                "apiKey": api_key
             }
             if st.session_state["type"] == "Deploy":
                 payload["deployPath"] = st.session_state["deploy_path"].strip()
