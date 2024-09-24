@@ -12,7 +12,8 @@ WEBHOOK_TYPES = ["Deploy", "Copy to Live", "Copy to Staging"]
 
 # Variables
 webhook_id = ""
-api_url = "https://seal-app-ng3cf.ondigitalocean.app/webhook"
+app_url = "https://seal-app-ng3cf.ondigitalocean.app"
+api_url = f"{app_url}/webhook"
 secret_key = os.environ.get("SECRET_KEY", "default_secret_key")
 
 # Functions
@@ -68,7 +69,7 @@ for key, value in default_values.items():
 
 # Streamlit app
 st.set_page_config(page_title="Webhooks for Git Deployments - Cloudways", page_icon="☁️")
-st.image("https://i0.wp.com/jaamiah.com/wp-content/uploads/2023/07/Cloudways-by-DO-Vertical-Blue@2x.png", use_column_width=False, width=250)
+st.image(f"{app_url}/static/cloudways-by-DO.png", use_column_width=False, width=250)
 
 # Webhook actions
 if st.session_state["webhook_action"] == "create":

@@ -1,12 +1,16 @@
 [theme]
 primaryColor="#2F39BF"
 
+[logger]
+level = "error"
+
 [browser]
 gatherUsageStats = false
-show_development_menu = false
 
 [server]
 enableXsrfProtection = true
+enableStaticServing = true
 
 [client]
 caching = true
+toolbarMode = "minimal"
