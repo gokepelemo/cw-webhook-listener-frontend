@@ -239,24 +239,25 @@ if not st.session_state["action_completed"]:
         # Validate form fields
         if not re.match(email_pattern, st.session_state["email"]):
             st.error("Invalid email address.")
-        elif st.session_state["webhook_action"] != "delete":
-            if not st.session_state["server_id"]:
-                st.error("Server ID is required.")
-            elif not st.session_state["app_id"]:
-                st.error("App ID is required.")
-            elif not st.session_state["type"]:
-                st.error("Type is required.")
-            elif st.session_state["type"] == "Deploy":
-                if not st.session_state["branch_name"]:
-                    st.error("Branch Name is required for Deploy webhooks.")
-            elif not st.session_state["deploy_path"]:
-                st.error("Deploy Path is required for Deploy webhooks.")
-            elif st.session_state["type"] in ["Copy to Live", "Copy to Staging"]:
-                if not st.session_state["staging_server_id"]:
-                    st.error("Staging Server ID is required for Copy to Live or Copy to Staging webhooks.")
-            elif not st.session_state["staging_app_id"]:
-                st.error("Staging App ID is required for Copy to Live or Copy to Staging webhooks.")
+        elif st.session_state["webhook_action"] == "create" and not st.session_state["api_key"]:
+            st.error("API Key is required.")
+        elif (not st.session_state["server_id"] or not st.session_state["app_id"]) and st.session_state["webhook_action"] != "delete":
+            st.error("Server ID and App ID are required.")
+        elif (st.session_state["type"] == "Deploy" and not st.session_state["branch_name"]):
+            st.error("Branch Name is required.")
+        elif (st.session_state["type"] in ["Copy to Live", "Copy to Staging"] and (not st.session_state["staging_server_id"] or not st.session_state["staging_app_id"])):
+            st.error("Staging Server ID and Staging App ID are required.")
         else:
+            normalized_type = st.session_state["type"].lower().replace(" ", "") if st.session_state["type"] else None
+            api_key = st.session_state["api_key"].strip() if st.session_state["api_key"] else os.environ.get("API_KEY")
+            if api_key:
+                encrypted_api_key = encrypt_api_key(api_key, scrypt_key)
+                api_key = {
+                    'salt': base64.b64encode(salt).decode('utf-8'),
+                    'ciphertext': encrypted_api_key['ciphertext'],
+                    'tag': encrypted_api_key['tag'],
+                    'nonce': encrypted_api_key['nonce']
+                }
             # Construct the payload
             payload = {
                 "secretKey": os.environ.get("SECRET_KEY", secret_key),
