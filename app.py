@@ -33,7 +33,7 @@ WEBHOOK_TYPE_MAP = {
 }
 
 # Variables
-app_url = "https://seal-app-ng3cf.ondigitalocean.app" if os.environ.get("PRODUCTION") == "True" else "http://localhost:3000"
+app_url = os.environ.get("APP_URL")
 api_url = f"{app_url}/webhook"
 secret_key = os.environ.get("SECRET_KEY")
 salt = get_random_bytes(16)
@@ -134,7 +134,7 @@ elif st.session_state["webhook_action"] == "update":
     st.button("Change Action: Delete Webhook", on_click=delete_webhook)
     webhook_id = st.text_input(
         "Webhook ID", 
-        placeholder="Enter a Webhook ID to populate its details", 
+        placeholder="Enter a webhook ID to populate its details", 
         on_change=reset_action_completed, 
         key="webhook_id", 
         autocomplete="on", 
@@ -144,7 +144,8 @@ elif st.session_state["webhook_action"] == "delete":
     st.subheader("Delete an existing webhook", anchor=False)
     st.button("Change Action: Create Webhook", on_click=create_webhook)
     webhook_id = st.text_input(
-        "Webhook ID", 
+        "Webhook ID",
+        placeholder="Enter a webhook ID to delete it",
         on_change=reset_action_completed, 
         key="webhook_id", 
         autocomplete="on"
@@ -166,7 +167,8 @@ if st.session_state["webhook_action"] == "create":
         key="api_key", 
         autocomplete="on", 
         placeholder="Optional: Enter to use your own API key", 
-        type="password"
+        type="password",
+        help="This is optional. If you don't provide an API key, a machine user at Cloudways will make the requests on your behalf."
     )
 
 if st.session_state["webhook_action"] != "delete":
@@ -333,9 +335,6 @@ if not st.session_state["action_completed"]:
                             display: flex;
                             justify-content: center;
                             margin-top: 1rem;
-                        }}
-                        button[title="View fullscreen"]{{
-                            display: none;
                         }}
                         </style>
                         <input type="text" value="{webhook_url}" id="webhookUrl" readonly />
