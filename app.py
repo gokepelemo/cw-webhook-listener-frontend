@@ -13,8 +13,7 @@ env()
 
 # Constants
 SESSION_STATE_MAP = {
-    "webhook_id": "webhook_id",
-    "email": "email",
+    "webhookId": "webhook_id",
     "backup": "backup",
     "serverId": "server_id",
     "appId": "app_id",
@@ -23,7 +22,8 @@ SESSION_STATE_MAP = {
     "stagingServerId": "staging_server_id",
     "stagingAppId": "staging_app_id",
     "type": "type",
-    "apiKey": "api_key"
+    "email": "email",
+    "apiKey": "api_key",
 }
 
 WEBHOOK_TYPE_MAP = {
@@ -60,12 +60,12 @@ def reset_action_completed(webhook_id_changed=False):
         if webhook_details.status_code == 200:
             webhook = webhook_details.json()
             for key, value in webhook.items():
-                if key != "type" and key != "email":
-                    st.session_state[SESSION_STATE_MAP.get(key)] = value
-                elif key == "email":
+                if key == "webhookId" or key == "email" or key == "apiKey":
                     continue
-                else:
-                    st.session_state[key] = WEBHOOK_TYPE_MAP.get(value)
+                elif key == "type":
+                    st.session_state[SESSION_STATE_MAP[key]] = WEBHOOK_TYPE_MAP[value]
+                elif key in SESSION_STATE_MAP.keys():
+                    st.session_state[SESSION_STATE_MAP[key]] = value      
         else:
             st.error(f"Failed to retrieve webhook details: {webhook_details.text}", icon="❌")
     elif st.session_state["webhook_action"] != "create" and len(webhook_id) == 0:
@@ -156,7 +156,7 @@ email = st.text_input(
     on_change=reset_action_completed, 
     key="email", 
     autocomplete="email", 
-    placeholder=f"Confirm the email address to {st.session_state['webhook_action']} the webhook" if st.session_state["webhook_action"] != "create" else ""
+    placeholder=f"Confirm the webhook's email to {st.session_state['webhook_action']} it" if st.session_state["webhook_action"] != "create" else ""
 )
 
 if st.session_state["webhook_action"] == "create":
@@ -259,6 +259,8 @@ if not st.session_state["action_completed"]:
             # Construct the payload
             payload = {
                 "secretKey": os.environ.get("SECRET_KEY", secret_key),
+                "serverId": st.session_state["server_id"].strip(),
+                "appId": st.session_state["app_id"].strip(),
                 "backup": st.session_state["backup"],
                 "email": st.session_state["email"].strip(),
                 "type": normalized_type,
