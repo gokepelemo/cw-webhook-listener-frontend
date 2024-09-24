@@ -12,5 +12,4 @@ enableXsrfProtection = true
 enableStaticServing = true
 
 [client]
-caching = true
 toolbarMode = "minimal"

@@ -1,6 +1,7 @@
 import streamlit as st
 from dotenv import load_dotenv as env
 import requests
+import time
 import re
 import os
 
@@ -8,13 +9,35 @@ import os
 env()
 
 # Constants
-WEBHOOK_TYPES = ["Deploy", "Copy to Live", "Copy to Staging"]
+WEBHOOK_TYPES = [
+    "Deploy",
+    "Copy to Live",
+    "Copy to Staging"
+]
+
+SESSION_STATE_MAP = {
+    "webhook_id": "webhook_id",
+    "email": "email",
+    "backup": "backup",
+    "serverId": "server_id",
+    "appId": "app_id",
+    "deployPath": "deploy_path",
+    "branchName": "branch_name",
+    "stagingServerId": "staging_server_id",
+    "stagingAppId": "staging_app_id",
+    "type": "type"
+}
+
+WEBHOOK_TYPE_MAP = {
+    "deploy": "Deploy",
+    "copytolive": "Copy to Live",
+    "copytostaging": "Copy to Staging"
+}
 
 # Variables
-webhook_id = ""
-app_url = "https://seal-app-ng3cf.ondigitalocean.app"
+app_url = "https://seal-app-ng3cf.ondigitalocean.app" if os.environ.get("PRODUCTION") == "True" else "http://localhost:3000"
 api_url = f"{app_url}/webhook"
-secret_key = os.environ.get("SECRET_KEY", "default_secret_key")
+secret_key = os.environ.get("SECRET_KEY")
 
 # Functions
 def parse_webhook_type(webhook_type):
@@ -23,42 +46,61 @@ def parse_webhook_type(webhook_type):
     except ValueError:
         return None
 
-def reset_action_completed():
+# Reset action completed status and populate or clear form fields with webhook details on change
+def reset_action_completed(webhook_id_changed=False):
     st.session_state["action_completed"] = False
+    if (len(st.session_state["webhook_id"].strip()) == 26 and webhook_id_changed == True):
+        payload = {"secretKey": secret_key}
+        st.session_state["api_endpoint"] = f"{api_url}/{st.session_state["webhook_id"]}"
+        webhook_details = requests.post(f"{st.session_state["api_endpoint"]}/details", json=payload)
+        if webhook_details.status_code == 200:
+            webhook = webhook_details.json()
+            for key, value in webhook.items():
+                if key != "type":
+                    st.session_state[SESSION_STATE_MAP.get(key)] = value
+                elif key == "type":
+                    st.session_state[key] = WEBHOOK_TYPE_MAP.get(value)   
+        else:
+            st.error(f"Failed to retrieve webhook details: {webhook_details.text}", icon="❌")
+    elif (len(st.session_state["webhook_id"].strip()) == 0):
+        clear_form_fields()
+
+# Clear form field session keys every time the webhook action changes
+def clear_form_fields():
+    for key in SESSION_STATE_MAP.values():
+        if key == "type":
+            st.session_state[key] = None 
+        elif key == "backup":
+            st.session_state[key] = False
+        else:
+            st.session_state[key] = ""
 
 def create_webhook():
     st.session_state["webhook_action"] = "create"
     st.session_state["api_method"] = "POST"
     st.session_state["api_endpoint"] = f"{api_url}/add"
+    clear_form_fields()
 
 def update_webhook(webhook_id=""):
     st.session_state["webhook_action"] = "update"
     st.session_state["api_method"] = "PUT"
-    st.session_state["api_endpoint"] = f"{api_url}/{webhook_id}"
+    st.session_state["api_endpoint"] = f"{api_url}/{st.session_state["webhook_id"]}"
+    clear_form_fields()
     
 def delete_webhook(webhook_id=""):
     st.session_state["webhook_action"] = "delete"
     st.session_state["api_method"] = "DELETE"
-    st.session_state["api_endpoint"] = f"{api_url}/{webhook_id}"
-    
-def simulate_update_webhook():
-    return {server_id: "123", app_id: "456", type: "Deploy", deploy_path: "public", branch_name: "main"}
+    st.session_state["api_endpoint"] = f"{api_url}/{st.session_state["webhook_id"]}"
+    clear_form_fields()
 
 # Instantiate session state with default values
 default_values = {
-    "email": "",
+    "webhook_id": "",
     "action_completed": False,
     "webhook_action": "create",
-    "server_id": "",
-    "app_id": "",
     "type": None,
     "api_method": "POST",
     "api_endpoint": f"{api_url}/add",
-    "webhook_id": "",
-    "deploy_path": "",
-    "branch_name": "",
-    "staging_server_id": "",
-    "staging_app_id": "",
     "backup": False
 }
 
@@ -69,7 +111,7 @@ for key, value in default_values.items():
 
 # Streamlit app
 st.set_page_config(page_title="Webhooks for Git Deployments - Cloudways", page_icon="☁️")
-st.image(f"{app_url}/static/cloudways-by-DO.png", use_column_width=False, width=250)
+st.image("https://i.imgur.com/jg9Vyjm.png", use_column_width=False, width=250)
 
 # Webhook actions
 if st.session_state["webhook_action"] == "create":
@@ -78,11 +120,11 @@ if st.session_state["webhook_action"] == "create":
 elif st.session_state["webhook_action"] == "update":
     st.button("Change Action: Delete Webhook", on_click=delete_webhook)
     st.subheader("Update an existing webhook for git deploys", anchor=False)
-    webhook_id = st.text_input("Webhook ID")
+    webhook_id = st.text_input("Webhook ID", placeholder="Enter a Webhook ID to populate its details", on_change=reset_action_completed, key="webhook_id", value=st.session_state.get("webhook_id", ""), autocomplete="on", args=(True,))
 elif st.session_state["webhook_action"] == "delete":
     st.button("Change Action: Create Webhook", on_click=create_webhook)
     st.subheader("Delete an existing webhook", anchor=False)
-    webhook_id = st.text_input("Webhook ID")
+    webhook_id = st.text_input("Webhook ID", on_change=reset_action_completed, key="webhook_id", value=st.session_state.get("webhook_id", ""), autocomplete="on")
 
 # Form inputs
 email = st.text_input("Email", on_change=reset_action_completed, key="email", value=st.session_state.get("email", ""), autocomplete="email")
@@ -94,7 +136,7 @@ if st.session_state["webhook_action"] != "delete":
 if st.session_state["type"] == "Deploy":
     deploy_path = st.text_input("Deploy Path", on_change=reset_action_completed, key="deploy_path", value=st.session_state.get("deploy_path", ""), autocomplete="on")
     branch_name = st.text_input("Branch Name", on_change=reset_action_completed, key="branch_name", value=st.session_state.get("branch_name", ""), autocomplete="on")
-elif st.session_state["type"] == "Copy to Live" or st.session_state["type"] == "Copy to Staging":
+elif (st.session_state["type"] == "Copy to Live" or st.session_state["type"] == "Copy to Staging") and st.session_state["webhook_action"] != "delete":
     staging_server_id = st.text_input("Staging Server ID", on_change=reset_action_completed, key="staging_server_id", value=st.session_state.get("staging_server_id", ""), autocomplete="on")
     staging_app_id = st.text_input("Staging App ID", on_change=reset_action_completed, key="staging_app_id", value=st.session_state.get("staging_app_id", ""), autocomplete="on")
 if st.session_state["webhook_action"] != "delete":
@@ -123,23 +165,23 @@ if not st.session_state["action_completed"]:
             st.error("Staging Server ID and Staging App ID are required for Copy to Live or Copy to Staging type.")
         else:
             # Payload
-            normalized_type = st.session_state["type"].replace(" ", "").lower()
+            normalized_type = st.session_state["type"].replace(" ", "").lower().strip()
             payload = {
-            "serverId": st.session_state["server_id"],
-            "appId": st.session_state["app_id"],
+            "serverId": st.session_state["server_id"].strip(),
+            "appId": st.session_state["app_id"].strip(),
             "secretKey": os.environ.get("SECRET_KEY", secret_key),
-            "backup": st.session_state["backup"],
-            "email": st.session_state["email"],
+            "backup": st.session_state["backup"].strip(),
+            "email": st.session_state["email"].strip(),
             "type": normalized_type,
             "apiKey": os.environ.get("API_KEY", "default_api_key")
             }
-            if type == "Deploy":
-                payload["deployPath"] = st.session_state["deploy_path"]
-                payload["branchName"] = st.session_state["branch_name"]
-            elif type == "Copy to Live" or type == "Copy to Staging":
-                payload["stagingServerId"] = st.session_state["staging_server_id"]
-                payload["stagingAppId"] = st.session_state["staging_app_id"]
-                payload["backup"] = st.session_state["backup"]
+            if st.session_state["type"] == "Deploy":
+                payload["deployPath"] = st.session_state["deploy_path"].strip()
+                payload["branchName"] = st.session_state["branch_name"].strip()
+            elif st.session_state["type"] == "Copy to Live" or st.session_state["type"] == "Copy to Staging":
+                payload["stagingServerId"] = st.session_state["staging_server_id"].strip()
+                payload["stagingAppId"] = st.session_state["staging_app_id"].strip()
+                payload["backup"] = st.session_state["backup"].strip()
 
             # Post request to the API
             if st.session_state["api_method"] == "POST":
@@ -153,12 +195,17 @@ if not st.session_state["action_completed"]:
 
             # Handle response
             if response.status_code == 200:
-                new_webhook = response.json()
-                webhook_url = f"{webhook_url}/{new_webhook['webhookId']}"
-                st.success(f"Your Webhook was created successfully. ID: {new_webhook['webhookId']}", icon="✅")
-                st.session_state["action_completed"] = True
+                if st.session_state["webhook_action"] == "delete":
+                    st.success(f"Webhook {st.session_state['webhook_id']} was deleted successfully.", icon="✅")
+                elif st.session_state["webhook_action"] == "update":
+                    st.success(f"Webhook {st.session_state['webhook_id']} was updated successfully.", icon="✅")
+                else:
+                    new_webhook = response.json()
+                    webhook_url = f"{api_url}/{new_webhook['webhookId']}"
+                    st.success(f"Your Webhook was created successfully. ID: {new_webhook['webhookId']}", icon="✅")
+                    st.session_state["action_completed"] = True
 
-                st.components.v1.html(f"""
+                    st.components.v1.html(f"""
                     <div>
                         <style>
                         :root {{
