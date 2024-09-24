@@ -1,2 +1,15 @@
+[global]
+log_level = "error"
+
 [theme]
 primaryColor="#2F39BF"
+
+[browser]
+gatherUsageStats = false
+show_development_menu = false
+
+[server]
+enableXsrfProtection = true
+
+[client]
+caching = true
