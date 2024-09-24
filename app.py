@@ -239,8 +239,6 @@ if not st.session_state["action_completed"]:
         # Validate form fields
         if not re.match(email_pattern, st.session_state["email"]):
             st.error("Invalid email address.")
-        elif st.session_state["webhook_action"] == "create" and not st.session_state["api_key"]:
-            st.error("API Key is required.")
         elif (not st.session_state["server_id"] or not st.session_state["app_id"]) and st.session_state["webhook_action"] != "delete":
             st.error("Server ID and App ID are required.")
         elif (st.session_state["type"] == "Deploy" and not st.session_state["branch_name"]):
