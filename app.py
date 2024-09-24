@@ -5,7 +5,6 @@ from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import scrypt
 from Crypto.Random import get_random_bytes
 import requests
-import time
 import re
 import os
 
@@ -119,20 +118,21 @@ st.image("https://i.imgur.com/jg9Vyjm.png", use_column_width=False, width=250)
 
 # Webhook actions
 if st.session_state["webhook_action"] == "create":
-    st.button("Change Action: Update Webhook", on_click=update_webhook)
     st.subheader("Create a new webhook for git deploys", anchor=False)
+    st.button("Change Action: Update Webhook", on_click=update_webhook)
 elif st.session_state["webhook_action"] == "update":
-    st.button("Change Action: Delete Webhook", on_click=delete_webhook)
     st.subheader("Update an existing webhook for git deploys", anchor=False)
+    st.button("Change Action: Delete Webhook", on_click=delete_webhook)
     webhook_id = st.text_input("Webhook ID", placeholder="Enter a Webhook ID to populate its details", on_change=reset_action_completed, key="webhook_id", value=st.session_state.get("webhook_id", ""), autocomplete="on", args=(True,))
 elif st.session_state["webhook_action"] == "delete":
-    st.button("Change Action: Create Webhook", on_click=create_webhook)
     st.subheader("Delete an existing webhook", anchor=False)
+    st.button("Change Action: Create Webhook", on_click=create_webhook)
     webhook_id = st.text_input("Webhook ID", on_change=reset_action_completed, key="webhook_id", autocomplete="on")
 
 # Form inputs
 email = st.text_input("Email", on_change=reset_action_completed, key="email", autocomplete="email")
-api_key = st.text_input("API Key", on_change=reset_action_completed, key="api_key", autocomplete="on", placeholder="Optional: Enter to use your own API key", type="password")
+if st.session_state["webhook_action"] != "create":
+    api_key = st.text_input("API Key", on_change=reset_action_completed, key="api_key", autocomplete="on", placeholder="Optional: Enter to use your own API key", type="password")
 if st.session_state["webhook_action"] != "delete":
     server_id = st.text_input("Server ID", on_change=reset_action_completed, key="server_id", autocomplete="on")
     app_id = st.text_input("App ID", on_change=reset_action_completed, key="app_id", autocomplete="on")
@@ -164,10 +164,10 @@ if not st.session_state["action_completed"]:
             st.error("App ID is required.")
         elif not st.session_state["type"]:
             st.error("Type is required.")
-        elif st.session_state["type"] == "Deploy" and (not st.session_state["deploy_path"] or not st.session_state["branch_name"]):
-            st.error("Deploy Path and Branch Name are required for Deploy type.")
+        elif st.session_state["type"] == "Deploy" and (not st.session_state["branch_name"]):
+            st.error("Branch Name is required for Deploy webhooks.")
         elif st.session_state["type"] in ["Copy to Live", "Copy to Staging"] and (not st.session_state["staging_server_id"] or not st.session_state["staging_app_id"]):
-            st.error("Staging Server ID and Staging App ID are required for Copy to Live or Copy to Staging type.")
+            st.error("Staging Server ID and Staging App ID are required for Copy to Live or Copy to Staging webhooks.")
         else:
             # Payload
             normalized_type = st.session_state["type"].replace(" ", "").lower()
