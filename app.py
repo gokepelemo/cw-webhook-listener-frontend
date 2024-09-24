@@ -95,6 +95,7 @@ def delete_webhook(webhook_id=""):
 
 # Instantiate session state with default values
 default_values = {
+    "email": "",
     "webhook_id": "",
     "action_completed": False,
     "webhook_action": "create",
@@ -124,21 +125,21 @@ elif st.session_state["webhook_action"] == "update":
 elif st.session_state["webhook_action"] == "delete":
     st.button("Change Action: Create Webhook", on_click=create_webhook)
     st.subheader("Delete an existing webhook", anchor=False)
-    webhook_id = st.text_input("Webhook ID", on_change=reset_action_completed, key="webhook_id", value=st.session_state.get("webhook_id", ""), autocomplete="on")
+    webhook_id = st.text_input("Webhook ID", on_change=reset_action_completed, key="webhook_id", autocomplete="on")
 
 # Form inputs
-email = st.text_input("Email", on_change=reset_action_completed, key="email", value=st.session_state.get("email", ""), autocomplete="email")
+email = st.text_input("Email", on_change=reset_action_completed, key="email", autocomplete="email")
 if st.session_state["webhook_action"] != "delete":
-    server_id = st.text_input("Server ID", on_change=reset_action_completed, key="server_id", value=st.session_state.get("server_id", ""), autocomplete="on")
-    app_id = st.text_input("App ID", on_change=reset_action_completed, key="app_id", value=st.session_state.get("app_id", ""), autocomplete="on")
+    server_id = st.text_input("Server ID", on_change=reset_action_completed, key="server_id", autocomplete="on")
+    app_id = st.text_input("App ID", on_change=reset_action_completed, key="app_id", autocomplete="on")
     type = st.selectbox("Type", WEBHOOK_TYPES, index=parse_webhook_type(st.session_state.get("type", "")), placeholder="Select a webhook type...", on_change=reset_action_completed, key="type")
 
 if st.session_state["type"] == "Deploy":
-    deploy_path = st.text_input("Deploy Path", on_change=reset_action_completed, key="deploy_path", value=st.session_state.get("deploy_path", ""), autocomplete="on")
-    branch_name = st.text_input("Branch Name", on_change=reset_action_completed, key="branch_name", value=st.session_state.get("branch_name", ""), autocomplete="on")
+    deploy_path = st.text_input("Deploy Path", on_change=reset_action_completed, key="deploy_path", autocomplete="on")
+    branch_name = st.text_input("Branch Name", on_change=reset_action_completed, key="branch_name", autocomplete="on")
 elif (st.session_state["type"] == "Copy to Live" or st.session_state["type"] == "Copy to Staging") and st.session_state["webhook_action"] != "delete":
-    staging_server_id = st.text_input("Staging Server ID", on_change=reset_action_completed, key="staging_server_id", value=st.session_state.get("staging_server_id", ""), autocomplete="on")
-    staging_app_id = st.text_input("Staging App ID", on_change=reset_action_completed, key="staging_app_id", value=st.session_state.get("staging_app_id", ""), autocomplete="on")
+    staging_server_id = st.text_input("Staging Server ID", on_change=reset_action_completed, key="staging_server_id", autocomplete="on")
+    staging_app_id = st.text_input("Staging App ID", on_change=reset_action_completed, key="staging_app_id", autocomplete="on")
 if st.session_state["webhook_action"] != "delete":
     backup=st.toggle("Take backup first", on_change=reset_action_completed, key="backup", value=False)
 
@@ -165,12 +166,12 @@ if not st.session_state["action_completed"]:
             st.error("Staging Server ID and Staging App ID are required for Copy to Live or Copy to Staging type.")
         else:
             # Payload
-            normalized_type = st.session_state["type"].replace(" ", "").lower().strip()
+            normalized_type = st.session_state["type"].replace(" ", "").lower()
             payload = {
             "serverId": st.session_state["server_id"].strip(),
             "appId": st.session_state["app_id"].strip(),
             "secretKey": os.environ.get("SECRET_KEY", secret_key),
-            "backup": st.session_state["backup"].strip(),
+            "backup": st.session_state["backup"],
             "email": st.session_state["email"].strip(),
             "type": normalized_type,
             "apiKey": os.environ.get("API_KEY", "default_api_key")
