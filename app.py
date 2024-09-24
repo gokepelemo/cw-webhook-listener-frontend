@@ -9,12 +9,6 @@ import os
 env()
 
 # Constants
-WEBHOOK_TYPES = [
-    "Deploy",
-    "Copy to Live",
-    "Copy to Staging"
-]
-
 SESSION_STATE_MAP = {
     "webhook_id": "webhook_id",
     "email": "email",
@@ -40,30 +34,29 @@ api_url = f"{app_url}/webhook"
 secret_key = os.environ.get("SECRET_KEY")
 
 # Functions
-# Reset action completed status and populate or clear form fields with webhook details on change
 def reset_action_completed(webhook_id_changed=False):
     st.session_state["action_completed"] = False
-    if (len(st.session_state["webhook_id"].strip()) == 26 and webhook_id_changed == True):
+    webhook_id = st.session_state["webhook_id"].strip()
+    if len(webhook_id) == 26 and webhook_id_changed:
         payload = {"secretKey": secret_key}
-        st.session_state["api_endpoint"] = f"{api_url}/{st.session_state["webhook_id"]}"
-        webhook_details = requests.post(f"{st.session_state["api_endpoint"]}/details", json=payload)
+        st.session_state["api_endpoint"] = f"{api_url}/{webhook_id}"
+        webhook_details = requests.post(f"{st.session_state['api_endpoint']}/details", json=payload)
         if webhook_details.status_code == 200:
             webhook = webhook_details.json()
             for key, value in webhook.items():
                 if key != "type":
                     st.session_state[SESSION_STATE_MAP.get(key)] = value
-                elif key == "type":
-                    st.session_state[key] = WEBHOOK_TYPE_MAP.get(value)   
+                else:
+                    st.session_state[key] = WEBHOOK_TYPE_MAP.get(value)
         else:
             st.error(f"Failed to retrieve webhook details: {webhook_details.text}", icon="❌")
-    elif (len(st.session_state["webhook_id"].strip()) == 0):
+    elif len(webhook_id) == 0:
         clear_form_fields()
 
-# Clear form field session keys every time the webhook action changes
 def clear_form_fields():
     for key in SESSION_STATE_MAP.values():
         if key == "type":
-            st.session_state[key] = None 
+            st.session_state[key] = None
         elif key == "backup":
             st.session_state[key] = False
         else:
@@ -78,13 +71,13 @@ def create_webhook():
 def update_webhook(webhook_id=""):
     st.session_state["webhook_action"] = "update"
     st.session_state["api_method"] = "PUT"
-    st.session_state["api_endpoint"] = f"{api_url}/{st.session_state["webhook_id"]}"
+    st.session_state["api_endpoint"] = f"{api_url}/{st.session_state['webhook_id']}"
     clear_form_fields()
-    
+
 def delete_webhook(webhook_id=""):
     st.session_state["webhook_action"] = "delete"
     st.session_state["api_method"] = "DELETE"
-    st.session_state["api_endpoint"] = f"{api_url}/{st.session_state["webhook_id"]}"
+    st.session_state["api_endpoint"] = f"{api_url}/{st.session_state['webhook_id']}"
     clear_form_fields()
 
 # Instantiate session state with default values
@@ -102,7 +95,6 @@ default_values = {
 for key, value in default_values.items():
     if key not in st.session_state:
         st.session_state[key] = value
-
 
 # Streamlit app
 st.set_page_config(page_title="Webhooks for Git Deployments - Cloudways", page_icon="☁️")
@@ -126,23 +118,23 @@ email = st.text_input("Email", on_change=reset_action_completed, key="email", au
 if st.session_state["webhook_action"] != "delete":
     server_id = st.text_input("Server ID", on_change=reset_action_completed, key="server_id", autocomplete="on")
     app_id = st.text_input("App ID", on_change=reset_action_completed, key="app_id", autocomplete="on")
-    type = st.selectbox("Type", WEBHOOK_TYPES, index=None, placeholder="Select a webhook type...", on_change=reset_action_completed, key="type")
+    type = st.selectbox("Type", WEBHOOK_TYPE_MAP.values(), index=None, placeholder="Select a webhook type...", on_change=reset_action_completed, key="type")
 
 if st.session_state["type"] == "Deploy":
     deploy_path = st.text_input("Deploy Path", on_change=reset_action_completed, key="deploy_path", autocomplete="on")
     branch_name = st.text_input("Branch Name", on_change=reset_action_completed, key="branch_name", autocomplete="on")
-elif (st.session_state["type"] == "Copy to Live" or st.session_state["type"] == "Copy to Staging") and st.session_state["webhook_action"] != "delete":
+elif st.session_state["type"] in ["Copy to Live", "Copy to Staging"] and st.session_state["webhook_action"] != "delete":
     staging_server_id = st.text_input("Staging Server ID", on_change=reset_action_completed, key="staging_server_id", autocomplete="on")
     staging_app_id = st.text_input("Staging App ID", on_change=reset_action_completed, key="staging_app_id", autocomplete="on")
 if st.session_state["webhook_action"] != "delete":
-    backup=st.toggle("Take backup first", on_change=reset_action_completed, key="backup", value=False)
+    backup = st.checkbox("Take backup first", on_change=reset_action_completed, key="backup", value=False)
 
 # Form submission
 if not st.session_state["action_completed"]:
     if st.session_state["webhook_action"] == "delete":
         button_label = "Delete the Webhook"
     else:
-        button_label = f"{'Update the' if st.session_state['webhook_action'] == 'update' else 'Create a'} {type if type else ''} Webhook"
+        button_label = f"{'Update the' if st.session_state['webhook_action'] == 'update' else 'Create a'} {st.session_state['type'] if st.session_state['type'] else ''} Webhook"
     if st.button(button_label):
         # Validate email
         email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
@@ -162,34 +154,35 @@ if not st.session_state["action_completed"]:
             # Payload
             normalized_type = st.session_state["type"].replace(" ", "").lower()
             payload = {
-            "serverId": st.session_state["server_id"].strip(),
-            "appId": st.session_state["app_id"].strip(),
-            "secretKey": os.environ.get("SECRET_KEY", secret_key),
-            "backup": st.session_state["backup"],
-            "email": st.session_state["email"].strip(),
-            "type": normalized_type,
-            "apiKey": os.environ.get("API_KEY", "default_api_key")
+                "serverId": st.session_state["server_id"].strip(),
+                "appId": st.session_state["app_id"].strip(),
+                "secretKey": os.environ.get("SECRET_KEY", secret_key),
+                "backup": st.session_state["backup"],
+                "email": st.session_state["email"].strip(),
+                "type": normalized_type,
+                "apiKey": os.environ.get("API_KEY", "default_api_key")
             }
             if st.session_state["type"] == "Deploy":
                 payload["deployPath"] = st.session_state["deploy_path"].strip()
                 payload["branchName"] = st.session_state["branch_name"].strip()
-            elif st.session_state["type"] == "Copy to Live" or st.session_state["type"] == "Copy to Staging":
+            elif st.session_state["type"] in ["Copy to Live", "Copy to Staging"]:
                 payload["stagingServerId"] = st.session_state["staging_server_id"].strip()
                 payload["stagingAppId"] = st.session_state["staging_app_id"].strip()
-                payload["backup"] = st.session_state["backup"].strip()
 
             # Post request to the API
-            if st.session_state["api_method"] == "POST":
-                response = requests.post(st.session_state["api_endpoint"], json=payload)
-            elif st.session_state["api_method"] == "PUT":
-                response = requests.put(st.session_state["api_endpoint"], json=payload)
-            elif st.session_state["api_method"] == "DELETE":
-                response = requests.delete(st.session_state["api_endpoint"], json=payload)
-            else:
-                st.error("Invalid action type.")
+            try:
+                if st.session_state["api_method"] == "POST":
+                    response = requests.post(st.session_state["api_endpoint"], json=payload)
+                elif st.session_state["api_method"] == "PUT":
+                    response = requests.put(st.session_state["api_endpoint"], json=payload)
+                elif st.session_state["api_method"] == "DELETE":
+                    response = requests.delete(st.session_state["api_endpoint"], json=payload)
+                else:
+                    st.error("Invalid action type.")
 
-            # Handle response
-            if response.status_code == 200:
+                response.raise_for_status()  # Raise an exception for HTTP errors
+
+                # Handle response
                 if st.session_state["webhook_action"] == "delete":
                     st.success(f"Webhook {st.session_state['webhook_id']} was deleted successfully.", icon="✅")
                 elif st.session_state["webhook_action"] == "update":
@@ -244,8 +237,7 @@ if not st.session_state["action_completed"]:
                         }}
                     </script>
                 """, height=100)
-            else:
-                st.error(f"Failed to submit deployment request: {response.text}", icon="❌")
+            except requests.exceptions.RequestException as e:
+                st.error(f"API request failed: {e}")
 else:
     st.warning("Webhook already created.", icon="⚠️")
-            
