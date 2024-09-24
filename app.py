@@ -60,8 +60,10 @@ def reset_action_completed(webhook_id_changed=False):
         if webhook_details.status_code == 200:
             webhook = webhook_details.json()
             for key, value in webhook.items():
-                if key != "type":
+                if key != "type" and key != "email":
                     st.session_state[SESSION_STATE_MAP.get(key)] = value
+                elif key == "email":
+                    continue
                 else:
                     st.session_state[key] = WEBHOOK_TYPE_MAP.get(value)
         else:
@@ -77,6 +79,7 @@ def clear_form_fields():
             st.session_state[key] = False
         else:
             st.session_state[key] = ""
+    st.session_state["action_completed"] = False
 
 def create_webhook():
     st.session_state["webhook_action"] = "create"
@@ -98,6 +101,12 @@ def delete_webhook(webhook_id=""):
 
 # Instantiate session state with default values
 default_values = {
+    "api_key": "",
+    "server_id": "",
+    "app_id": "",
+    "deploy_path": "",
+    "branch_name": "",
+    "staging_server_id": "",
     "email": "",
     "webhook_id": "",
     "action_completed": False,
@@ -123,29 +132,99 @@ if st.session_state["webhook_action"] == "create":
 elif st.session_state["webhook_action"] == "update":
     st.subheader("Update an existing webhook for git deploys", anchor=False)
     st.button("Change Action: Delete Webhook", on_click=delete_webhook)
-    webhook_id = st.text_input("Webhook ID", placeholder="Enter a Webhook ID to populate its details", on_change=reset_action_completed, key="webhook_id", value=st.session_state.get("webhook_id", ""), autocomplete="on", args=(True,))
+    webhook_id = st.text_input(
+        "Webhook ID", 
+        placeholder="Enter a Webhook ID to populate its details", 
+        on_change=reset_action_completed, 
+        key="webhook_id", 
+        autocomplete="on", 
+        args=(True,)
+    )
 elif st.session_state["webhook_action"] == "delete":
     st.subheader("Delete an existing webhook", anchor=False)
     st.button("Change Action: Create Webhook", on_click=create_webhook)
-    webhook_id = st.text_input("Webhook ID", on_change=reset_action_completed, key="webhook_id", autocomplete="on")
+    webhook_id = st.text_input(
+        "Webhook ID", 
+        on_change=reset_action_completed, 
+        key="webhook_id", 
+        autocomplete="on"
+    )
 
 # Form inputs
-email = st.text_input("Email", on_change=reset_action_completed, key="email", autocomplete="email")
+email = st.text_input(
+    "Email", 
+    on_change=reset_action_completed, 
+    key="email", 
+    autocomplete="email", 
+    placeholder=f"Confirm the email address to {st.session_state['webhook_action']} the webhook" if st.session_state["webhook_action"] != "create" else ""
+)
+
 if st.session_state["webhook_action"] == "create":
-    api_key = st.text_input("API Key", on_change=reset_action_completed, key="api_key", autocomplete="on", placeholder="Optional: Enter to use your own API key", type="password")
+    api_key = st.text_input(
+        "API Key", 
+        on_change=reset_action_completed, 
+        key="api_key", 
+        autocomplete="on", 
+        placeholder="Optional: Enter to use your own API key", 
+        type="password"
+    )
+
 if st.session_state["webhook_action"] != "delete":
-    server_id = st.text_input("Server ID", on_change=reset_action_completed, key="server_id", autocomplete="on")
-    app_id = st.text_input("App ID", on_change=reset_action_completed, key="app_id", autocomplete="on")
-    type = st.selectbox("Type", WEBHOOK_TYPE_MAP.values(), index=None, placeholder="Select a webhook type...", on_change=reset_action_completed, key="type")
+    server_id = st.text_input(
+        "Server ID", 
+        on_change=reset_action_completed, 
+        key="server_id", 
+        autocomplete="on"
+    )
+    app_id = st.text_input(
+        "App ID", 
+        on_change=reset_action_completed, 
+        key="app_id", 
+        autocomplete="on"
+    )
+    type = st.selectbox(
+        "Type", 
+        WEBHOOK_TYPE_MAP.values(), 
+        index=None, 
+        placeholder="Select a webhook type...", 
+        on_change=reset_action_completed, 
+        key="type"
+    )
 
 if st.session_state["type"] == "Deploy":
-    deploy_path = st.text_input("Deploy Path", on_change=reset_action_completed, key="deploy_path", autocomplete="on")
-    branch_name = st.text_input("Branch Name", on_change=reset_action_completed, key="branch_name", autocomplete="on")
+    deploy_path = st.text_input(
+        "Deploy Path", 
+        on_change=reset_action_completed, 
+        key="deploy_path", 
+        autocomplete="on"
+    )
+    branch_name = st.text_input(
+        "Branch Name", 
+        on_change=reset_action_completed, 
+        key="branch_name", 
+        autocomplete="on"
+    )
 elif st.session_state["type"] in ["Copy to Live", "Copy to Staging"] and st.session_state["webhook_action"] != "delete":
-    staging_server_id = st.text_input("Staging Server ID", on_change=reset_action_completed, key="staging_server_id", autocomplete="on")
-    staging_app_id = st.text_input("Staging App ID", on_change=reset_action_completed, key="staging_app_id", autocomplete="on")
+    staging_server_id = st.text_input(
+        "Staging Server ID", 
+        on_change=reset_action_completed, 
+        key="staging_server_id", 
+        autocomplete="on"
+    )
+    staging_app_id = st.text_input(
+        "Staging App ID", 
+        on_change=reset_action_completed, 
+        key="staging_app_id", 
+        autocomplete="on"
+    )
+
 if st.session_state["webhook_action"] != "delete":
-    backup = st.checkbox("Take backup first", on_change=reset_action_completed, key="backup", value=False)
+    backup = st.checkbox(
+        "Take backup first", 
+        on_change=reset_action_completed, 
+        key="backup", 
+        value=False
+    )
 
 # Form submission
 if not st.session_state["action_completed"]:
@@ -153,48 +232,55 @@ if not st.session_state["action_completed"]:
         button_label = "Delete the Webhook"
     else:
         button_label = f"{'Update the' if st.session_state['webhook_action'] == 'update' else 'Create a'} {st.session_state['type'] if st.session_state['type'] else ''} Webhook"
+    
     if st.button(button_label):
         # Validate email
         email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+        # Validate form fields
         if not re.match(email_pattern, st.session_state["email"]):
             st.error("Invalid email address.")
-        elif not st.session_state["server_id"]:
-            st.error("Server ID is required.")
-        elif not st.session_state["app_id"]:
-            st.error("App ID is required.")
-        elif not st.session_state["type"]:
-            st.error("Type is required.")
-        elif st.session_state["type"] == "Deploy" and (not st.session_state["branch_name"]):
-            st.error("Branch Name is required for Deploy webhooks.")
-        elif st.session_state["type"] in ["Copy to Live", "Copy to Staging"] and (not st.session_state["staging_server_id"] or not st.session_state["staging_app_id"]):
-            st.error("Staging Server ID and Staging App ID are required for Copy to Live or Copy to Staging webhooks.")
+        elif st.session_state["webhook_action"] != "delete":
+            if not st.session_state["server_id"]:
+                st.error("Server ID is required.")
+            elif not st.session_state["app_id"]:
+                st.error("App ID is required.")
+            elif not st.session_state["type"]:
+                st.error("Type is required.")
+            elif st.session_state["type"] == "Deploy":
+                if not st.session_state["branch_name"]:
+                    st.error("Branch Name is required for Deploy webhooks.")
+            elif not st.session_state["deploy_path"]:
+                st.error("Deploy Path is required for Deploy webhooks.")
+            elif st.session_state["type"] in ["Copy to Live", "Copy to Staging"]:
+                if not st.session_state["staging_server_id"]:
+                    st.error("Staging Server ID is required for Copy to Live or Copy to Staging webhooks.")
+            elif not st.session_state["staging_app_id"]:
+                st.error("Staging App ID is required for Copy to Live or Copy to Staging webhooks.")
         else:
-            # Payload
-            normalized_type = st.session_state["type"].replace(" ", "").lower()
-            api_key = st.session_state["api_key"].strip() if st.session_state["api_key"] else os.environ.get("API_KEY")
-            if api_key:
-                encrypted_api_key = encrypt_api_key(api_key, scrypt_key)
-                api_key = {
-                    'salt': base64.b64encode(salt).decode('utf-8'),
-                    'ciphertext': encrypted_api_key['ciphertext'],
-                    'tag': encrypted_api_key['tag'],
-                    'nonce': encrypted_api_key['nonce']
-                }
+            # Construct the payload
             payload = {
-                "serverId": st.session_state["server_id"].strip(),
-                "appId": st.session_state["app_id"].strip(),
                 "secretKey": os.environ.get("SECRET_KEY", secret_key),
                 "backup": st.session_state["backup"],
                 "email": st.session_state["email"].strip(),
                 "type": normalized_type,
                 "apiKey": api_key
             }
+
+            # Add additional fields based on the webhook type
             if st.session_state["type"] == "Deploy":
                 payload["deployPath"] = st.session_state["deploy_path"].strip()
                 payload["branchName"] = st.session_state["branch_name"].strip()
             elif st.session_state["type"] in ["Copy to Live", "Copy to Staging"]:
                 payload["stagingServerId"] = st.session_state["staging_server_id"].strip()
                 payload["stagingAppId"] = st.session_state["staging_app_id"].strip()
+
+            # Set API endpoint based on the webhook action
+            if st.session_state["webhook_action"] == "create":
+                st.session_state["api_endpoint"] = f"{api_url}/add"
+            elif st.session_state["webhook_action"] == "update":
+                st.session_state["api_endpoint"] = f"{api_url}/{st.session_state['webhook_id']}"
+            elif st.session_state["webhook_action"] == "delete":
+                st.session_state["api_endpoint"] = f"{api_url}/{st.session_state['webhook_id']}"
 
             # Post request to the API
             try:
@@ -205,8 +291,8 @@ if not st.session_state["action_completed"]:
                 elif st.session_state["api_method"] == "DELETE":
                     response = requests.delete(st.session_state["api_endpoint"], json=payload)
                 else:
-                    st.error("Invalid action type.")
-
+                    st.error("Invalid API method.")
+                
                 response.raise_for_status()  # Raise an exception for HTTP errors
 
                 # Handle response
@@ -252,7 +338,9 @@ if not st.session_state["action_completed"]:
                         }}
                         </style>
                         <input type="text" value="{webhook_url}" id="webhookUrl" readonly />
-                        <div id="buttonContainer"><button onclick="copyToClipboard()" id="copyBtn">Copy Webhook URL</button></div>
+                        <div id="buttonContainer">
+                            <button onclick="copyToClipboard()" id="copyBtn">Copy Webhook URL</button>
+                        </div>
                     </div>
                     <script>
                         function copyToClipboard() {{
@@ -263,7 +351,7 @@ if not st.session_state["action_completed"]:
                             document.getElementById("copyBtn").innerText = "Copied!";
                         }}
                     </script>
-                """, height=100)
+                    """, height=100)
             except requests.exceptions.RequestException as e:
                 st.error(f"API request failed: {e}")
 else:
