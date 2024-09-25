@@ -7,6 +7,7 @@ from Crypto.Random import get_random_bytes
 import requests
 import re
 import os
+import html
 
 # Load environment variables from .env file
 env()
@@ -99,6 +100,10 @@ def delete_webhook(webhook_id=""):
     st.session_state["api_endpoint"] = f"{api_url}/{st.session_state['webhook_id']}"
     clear_form_fields()
 
+def validate_digit_input(input, message):
+    if input and not input.isdigit():
+        st.error(message)
+
 # Instantiate session state with default values
 default_values = {
     "api_key": "",
@@ -124,28 +129,31 @@ for key, value in default_values.items():
 # Streamlit app
 st.set_page_config(page_title="Webhooks for Git Deployments - Cloudways", page_icon="☁️")
 st.image("https://i.imgur.com/jg9Vyjm.png", use_column_width=False, width=250)
+st.subheader(f"{st.session_state["webhook_action"].capitalize()} {"a" if st.session_state["webhook_action"] == "create" else "an existing"} webhook", anchor=False)
+with st.popover("ℹ️ More Information"):
+    st.html(f"""
+                Webhooks are used to trigger events on the Cloudways platform. You can create a webhook to deploy application code from your configured git repository, copy the live application to the staging application, or vice versa. You can also update a webhook you create or delete it.
+                Read more about deploying with webhooks in the <a href="https://support.cloudways.com/en/articles/5124785-automatically-deploy-from-git-to-server-using-webhooks" target="_blank">Cloudways documentation</a>.
+                """)
 
 # Webhook actions
 if st.session_state["webhook_action"] == "create":
-    st.subheader("Create a new webhook for git deploys", anchor=False)
     st.button("Change Action: Update Webhook", on_click=update_webhook)
 elif st.session_state["webhook_action"] == "update":
-    st.subheader("Update an existing webhook for git deploys", anchor=False)
     st.button("Change Action: Delete Webhook", on_click=delete_webhook)
     webhook_id = st.text_input(
         "Webhook ID", 
-        placeholder="Enter a webhook ID to populate its details", 
+        placeholder="Webhook ID to update", 
         on_change=reset_action_completed, 
         key="webhook_id", 
         autocomplete="on", 
         args=(True,)
     )
 elif st.session_state["webhook_action"] == "delete":
-    st.subheader("Delete an existing webhook", anchor=False)
     st.button("Change Action: Create Webhook", on_click=create_webhook)
     webhook_id = st.text_input(
         "Webhook ID",
-        placeholder="Enter a webhook ID to delete it",
+        placeholder="Webhook ID to delete",
         on_change=reset_action_completed, 
         key="webhook_id", 
         autocomplete="on"
@@ -157,7 +165,7 @@ email = st.text_input(
     on_change=reset_action_completed, 
     key="email", 
     autocomplete="email", 
-    placeholder=f"Confirm the webhook's email to {st.session_state['webhook_action']} it" if st.session_state["webhook_action"] != "create" else ""
+    placeholder=f"Confirm the webhook email address to {st.session_state['webhook_action']}" if st.session_state["webhook_action"] != "create" else ""
 )
 
 if st.session_state["webhook_action"] == "create":
@@ -171,19 +179,31 @@ if st.session_state["webhook_action"] == "create":
         help="This is optional. If you don't provide an API key, a machine user at Cloudways will make the requests on your behalf."
     )
 
+
 if st.session_state["webhook_action"] != "delete":
+    # Take a server ID
     server_id = st.text_input(
         "Server ID", 
         on_change=reset_action_completed, 
         key="server_id", 
         autocomplete="on"
     )
+
+    # Validate that the server_id contains only numbers
+    validate_digit_input(server_id, "Server ID must contain only numbers.")
+
+    # Take an app ID
     app_id = st.text_input(
         "App ID", 
         on_change=reset_action_completed, 
         key="app_id", 
         autocomplete="on"
     )
+    
+    # Validate that the app_id contains only numbers
+    validate_digit_input(app_id, "App ID must contain only numbers.")
+
+    # Take a webhook type
     type = st.selectbox(
         "Type", 
         WEBHOOK_TYPE_MAP.values(), 
@@ -194,12 +214,17 @@ if st.session_state["webhook_action"] != "delete":
     )
 
 if st.session_state["type"] == "Deploy":
+
+    # Take a deploy path
     deploy_path = st.text_input(
         "Deploy Path", 
         on_change=reset_action_completed, 
         key="deploy_path", 
-        autocomplete="on"
+        autocomplete="on",
+        help="Enter the path to the directory where the code will be deployed. Paths are relative to public_html, so leave empty to deploy to public_html. Example: myapp -> /public_html/myapp."
     )
+    
+    # Take a branch name
     branch_name = st.text_input(
         "Branch Name", 
         on_change=reset_action_completed, 
@@ -207,18 +232,28 @@ if st.session_state["type"] == "Deploy":
         autocomplete="on"
     )
 elif st.session_state["type"] in ["Copy to Live", "Copy to Staging"] and st.session_state["webhook_action"] != "delete":
+
+    # Take a staging server ID
     staging_server_id = st.text_input(
         "Staging Server ID", 
         on_change=reset_action_completed, 
         key="staging_server_id", 
         autocomplete="on"
     )
+    
+    # Validate that the staging_server_id contains only numbers
+    validate_digit_input(staging_server_id, "Staging Server ID must contain only numbers.")
+        
+    # Take a staging app ID
     staging_app_id = st.text_input(
         "Staging App ID", 
         on_change=reset_action_completed, 
         key="staging_app_id", 
         autocomplete="on"
     )
+    
+    # Validate that the staging_app_id contains only numbers
+    validate_digit_input(staging_app_id, "Staging App ID must contain only numbers.")
 
 if st.session_state["webhook_action"] != "delete":
     backup = st.checkbox(
@@ -236,8 +271,9 @@ if not st.session_state["action_completed"]:
         button_label = f"{'Update the' if st.session_state['webhook_action'] == 'update' else 'Create a'} {st.session_state['type'] if st.session_state['type'] else ''} Webhook"
     
     if st.button(button_label):
-        # Validate email
+        # Email regex pattern
         email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+        
         # Validate form fields
         if not re.match(email_pattern, st.session_state["email"]):
             st.error("Invalid email address.")
@@ -249,7 +285,7 @@ if not st.session_state["action_completed"]:
             st.error("Staging Server ID and Staging App ID are required.")
         else:
             normalized_type = st.session_state["type"].lower().replace(" ", "") if st.session_state["type"] else None
-            api_key = st.session_state["api_key"].strip() if st.session_state["api_key"] else os.environ.get("API_KEY")
+            api_key = html.escape(st.session_state["api_key"].strip()) if st.session_state["api_key"] else os.environ.get("API_KEY")
             if api_key:
                 encrypted_api_key = encrypt_api_key(api_key, scrypt_key)
                 api_key = {
@@ -258,7 +294,8 @@ if not st.session_state["action_completed"]:
                     'tag': encrypted_api_key['tag'],
                     'nonce': encrypted_api_key['nonce']
                 }
-            # Construct the payload
+                
+            # Construct the request payload
             payload = {
                 "secretKey": os.environ.get("SECRET_KEY", secret_key),
                 "serverId": st.session_state["server_id"].strip(),
@@ -271,8 +308,8 @@ if not st.session_state["action_completed"]:
 
             # Add additional fields based on the webhook type
             if st.session_state["type"] == "Deploy":
-                payload["deployPath"] = st.session_state["deploy_path"].strip()
-                payload["branchName"] = st.session_state["branch_name"].strip()
+                payload["deployPath"] = html.escape(st.session_state["deploy_path"].strip())
+                payload["branchName"] = html.escape(st.session_state["branch_name"].strip())
             elif st.session_state["type"] in ["Copy to Live", "Copy to Staging"]:
                 payload["stagingServerId"] = st.session_state["staging_server_id"].strip()
                 payload["stagingAppId"] = st.session_state["staging_app_id"].strip()
@@ -296,7 +333,8 @@ if not st.session_state["action_completed"]:
                 else:
                     st.error("Invalid API method.")
                 
-                response.raise_for_status()  # Raise an exception for HTTP errors
+                # Raise an exception for HTTP errors
+                response.raise_for_status()
 
                 # Handle response
                 if st.session_state["webhook_action"] == "delete":
